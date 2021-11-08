@@ -13,15 +13,15 @@
 
 
 // Sniffing
-#define TARGET "c0:c9:e3:49:9c:ff"
-#define CHANNEL 8
+#define TARGET "e6:95:6e:42:14:6f"
+#define CHANNEL 4
 #define TARGETMODE true
 #define TARGETINTERVAL 100 // ms
 
 // Upload Node
-#define UPLOADWIFISSID "Wi-Fi - 224"
+#define UPLOADWIFISSID "Openwrt"
 #define UPLOADWIFIPASS "21049510"
-#define UPLOAD_IP IPAddress(192,168,0,198)
+#define UPLOAD_IP IPAddress(192,168,1,1)
 #define UPLOAD_PORT 5001
 #define AGGREGATION 30 // MAX is 48
 const int SIZE = 500; // RSSI(2byte) + SEQ(2bytes) = 4 bytes
