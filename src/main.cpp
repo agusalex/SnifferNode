@@ -22,8 +22,13 @@
 #define UPLOADWIFISSID "RPI"
 #define UPLOADWIFIPASS "21049510"
 #define UPLOAD_IP IPAddress(192,168,4,1)
+#define UPLOAD_DHCP false
+#define DEVICE_IP IPAddress(192,168,4,2)
+#define DEVICE_GATEWAY IPAddress(192,168,4,1)
+#define DEVICE_SUBNET IPAddress(255,255,255,0)
 #define UPLOAD_PORT 5001
 #define AGGREGATION 30 // MAX is 48
+
 const int SIZE = 500; // RSSI(2byte) + SEQ(2bytes) = 4 bytes
 // UDP
 WiFiUDP UDP;
@@ -48,6 +53,24 @@ void mac2str(const uint8_t *ptr, char *string) {
 }
 
 void wifiConnect(const String &ssid, const String &pass) {// Begin WiFi
+    WiFi.begin(ssid, pass); // Connect to the network
+    if(!UPLOAD_DHCP) WiFi.config(DEVICE_IP, DEVICE_GATEWAY, DEVICE_SUBNET);
+    // Connecting to WiFi...
+    Serial.print("\nConnecting to ");
+    Serial.print(ssid + "\n");
+    // Loop continuously while WiFi is not connected
+    while (WiFi.status() != WL_CONNECTED) {
+        delay(100);
+        Serial.print(".");
+    }
+    // Connected to WiFi
+    Serial.println();
+    Serial.print("Connected! IP address: ");
+    Serial.println(WiFi.localIP());
+}
+
+
+void wifiConnectStatic(const String &ssid, const String &pass) {// Begin WiFi
     WiFi.begin(ssid, pass); // Connect to the network
     // Connecting to WiFi...
     Serial.print("\nConnecting to ");
