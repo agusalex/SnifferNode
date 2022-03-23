@@ -12,24 +12,25 @@
 #include <WiFiUdp.h>
 
 
-// Sniffing
-#define TARGET "b8:27:eb:9b:7f:b5"
-#define CHANNEL 11
+// Sniffing RPI b8:27:eb:9b:7f:e5
+// s20 32:ab:6a:73:19:14
+#define TARGET "32:ab:6a:73:19:14"
+#define CHANNEL 6
 #define TARGETMODE true
-#define TARGETINTERVAL 100 // ms
+#define TARGETINTERVAL 150 // ms 150 for samsung phone, 100 for RPI
 
 // Upload Node
 #define UPLOADWIFISSID "RPI"
 #define UPLOADWIFIPASS "21049510"
 #define UPLOAD_IP IPAddress(192,168,4,1)
 #define UPLOAD_DHCP false
-#define DEVICE_IP IPAddress(192,168,4,2)
+#define DEVICE_IP IPAddress(192,168,4,7x)
 #define DEVICE_GATEWAY IPAddress(192,168,4,1)
 #define DEVICE_SUBNET IPAddress(255,255,255,0)
 #define UPLOAD_PORT 5001
 #define AGGREGATION 30 // MAX is 48
 
-const int SIZE = 500; // RSSI(2byte) + SEQ(2bytes) = 4 bytes
+const int SIZE = 800; // RSSI(2byte) + SEQ(2bytes) = 4 bytes | Took 2 minutes for 800 messages on samsung phone (150ms)
 // UDP
 WiFiUDP UDP;
 
@@ -53,15 +54,16 @@ void mac2str(const uint8_t *ptr, char *string) {
 }
 
 void wifiConnect(const String &ssid, const String &pass) {// Begin WiFi
-    WiFi.begin(ssid, pass); // Connect to the network
-    if(!UPLOAD_DHCP) WiFi.config(DEVICE_IP, DEVICE_GATEWAY, DEVICE_SUBNET);
+
+    if (!UPLOAD_DHCP) WiFi.config(DEVICE_IP, DEVICE_GATEWAY, DEVICE_GATEWAY, DEVICE_SUBNET);
     // Connecting to WiFi...
+    WiFi.begin(ssid, pass); // Connect to the network
     Serial.print("\nConnecting to ");
     Serial.print(ssid + "\n");
     // Loop continuously while WiFi is not connected
     while (WiFi.status() != WL_CONNECTED) {
         delay(100);
-        Serial.print(".");
+        Serial.print(WiFi.status());
     }
     // Connected to WiFi
     Serial.println();
@@ -69,29 +71,12 @@ void wifiConnect(const String &ssid, const String &pass) {// Begin WiFi
     Serial.println(WiFi.localIP());
 }
 
-
-void wifiConnectStatic(const String &ssid, const String &pass) {// Begin WiFi
-    WiFi.begin(ssid, pass); // Connect to the network
-    // Connecting to WiFi...
-    Serial.print("\nConnecting to ");
-    Serial.print(ssid + "\n");
-    // Loop continuously while WiFi is not connected
-    while (WiFi.status() != WL_CONNECTED) {
-        delay(100);
-        Serial.print(".");
-    }
-    // Connected to WiFi
-    Serial.println();
-    Serial.print("Connected! IP address: ");
-    Serial.println(WiFi.localIP());
-}
 
 void UDPSend(IPAddress ip, int port, char buff[]) {
     UDP.beginPacket(ip, port);
     UDP.write(buff);
     UDP.endPacket();
 }
-
 
 
 boolean isTarget(String s) {
@@ -127,8 +112,9 @@ void wifi_sniffer_packet_handler(uint8_t *buff, uint16_t len) {
     unsigned int time = max((int) (sequence_nmb / TARGETINTERVAL), 1);
     int rssi = ppkt->rx_ctrl.rssi;
 
-    if (TARGETMODE) {
-        if (isTarget(sender)) {
+
+    if (isTarget(sender)) {
+        if (frame_ctrl->type == WIFI_PKT_MGMT && frame_ctrl->subtype == BEACON) {
             boolean maxTimeReached = (time > MAXTIME);
             boolean maxMeasurementReached = INDEX >= SIZE;
             if (maxMeasurementReached) {
@@ -141,36 +127,16 @@ void wifi_sniffer_packet_handler(uint8_t *buff, uint16_t len) {
                 SEQ[INDEX] = sequence_nmb;
                 INDEX += 1;
             }
+            Serial.printf("\nB %s , %s, %s, %d, %02d",
+                          reciever,
+                          sender,
+                          filtering,
+                          wifi_get_channel(),
+                          ppkt->rx_ctrl.rssi,
+                          sequence_nmb
+            );
         }
-    } /*
-        Serial.printf("\nB %s , %s , %s ,%02d , %-28s E",
-                      reciever,
-                      sender,
-                      filtering,
-                      wifi_get_channel(),
-                      ppkt->rx_ctrl.rssi,
-                      wifi_pkt_type2str((wifi_promiscuous_pkt_type_t) frame_ctrl->type,
-                                        (wifi_mgmt_subtypes_t) frame_ctrl->subtype)
-        );
-*/
-    // max 200 3 chars for time-->
-    // 2 chars for rssi
-    // total 5 chars per meassurement
-
-
-    /*   if (frame_ctrl->type == WIFI_PKT_MGMT && frame_ctrl->subtype == BEACON) {
-           const wifi_mgmt_beacon_t *beacon_frame = (wifi_mgmt_beacon_t *) ipkt->payload;
-           char ssid[32] = {0};
-           if (beacon_frame->tag_length >= 32) {
-               strncpy(ssid, beacon_frame->ssid, 31);
-           } else {
-               strncpy(ssid, beacon_frame->ssid, beacon_frame->tag_length);
-           }
-           String ssidstr(ssid);
-
-       }*/
-
-
+    }
 }
 
 
@@ -180,7 +146,6 @@ void setup() {
     Serial.println("Staring Sniffer");
     delay(10);
     wifi_set_channel(CHANNEL);
-
     // Wifi setup
     wifi_set_opmode(STATION_MODE);
     wifi_promiscuous_enable(0);
@@ -189,7 +154,6 @@ void setup() {
     // Set sniffer callback
     wifi_set_promiscuous_rx_cb(wifi_sniffer_packet_handler);
     wifi_promiscuous_enable(1);
-
 }
 
 void loop() {
@@ -198,7 +162,7 @@ void loop() {
         WiFi.disconnect();
         wifiConnect(UPLOADWIFISSID, UPLOADWIFIPASS);
         upload(UPLOAD_IP, UPLOAD_PORT, AGGREGATION, INDEX, SEQ, RSSI, UDPSend);
-        Serial.println("Data Sent! Rebooting now");
+        Serial.println("Data Sent!");
         uploadMode = false;
     }
     delay(10);
